@@ -3,7 +3,7 @@ const got = require("got");
 const Web3 = require("web3");
 const web3 = new Web3(
   new Web3.providers.HttpProvider(
-    `https://mainnet.infura.io/v3/${process.env.INFURAKEY}`
+    `https://${process.env.NETWORK}.infura.io/v3/${process.env.INFURAKEY}`
   )
 );
 const abiDecoder = require("abi-decoder");
