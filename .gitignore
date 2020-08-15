@@ -1,5 +1,6 @@
 .env
 /node-modules/*
 node-modules/
+node-modules
 package-lock.json
 yarn-lock
