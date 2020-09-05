@@ -62,9 +62,9 @@ async function sendNotification(data, template) {
       } else {
         messageContent += `*Reputation:*\nNo REP distributions\n\n`;
       }
-      if (data.proposal.decodedCalldata) {
-        messageContent += `*Function Call to be executed:*\n${data.proposal.decodedCalldata}\n`;
-        messageContent += `Raw Calldata.proposal: ${data.proposal.calldata}\n\n`;
+      if (data.proposal.decodedCallData) {
+        messageContent += `*Function Call to be executed:*\n${data.proposal.decodedCallData}\n\n`;
+        messageContent += `Raw Calldata: ${data.proposal.callData}\n\n`;
       }
       messageContent += `*Transaction:* ${data.proposal.transactionUrl}\n`;
       messageContent += `*Raw Transaction Log*: https://gateway.pinata.cloud/ipfs/${data.logHash}\n`;

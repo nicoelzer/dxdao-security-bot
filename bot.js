@@ -7,12 +7,8 @@ const schemeAdapter = new FileSync("./src/data/schemes.json");
 const schemeDB = low(schemeAdapter);
 const { contracts } = require("./src/data/baseContracts.js");
 var dateFormat = require("dateformat");
-var express = require("express");
-var port = process.env.PORT || 3000;
-var app = express();
 const pinataSDK = require("@pinata/sdk");
 const pinata = pinataSDK(process.env.PINATA_KEY, process.env.PINATA_SECRET);
-app.listen(port, function () {});
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const web3 = new Web3(
   new Web3.providers.HttpProvider(
@@ -303,7 +299,7 @@ async function getProposalDetails(schemeAddress, proposal) {
       transactionUrl = `https://etherscan.io/tx/${proposal.transactionHash}`;
     }
     if (proposal.returnValues._callData) {
-      let decodedResult = await decodeCall(
+       decodedResult = await decodeCall(
         JSON.parse(scheme.contractToCallAbi),
         proposal.returnValues._callData
       );
@@ -396,7 +392,9 @@ async function scanForSchemes() {
 async function scanForProposals() {
   try {
     let filter = {};
-    let scheme = await schemeDB.get("schemes").value();
+    const schemeDB = low(schemeAdapter);
+    const scheme = await schemeDB.get("schemes").value();
+
     const latestBlock = await web3.eth.getBlockNumber();
     for (var i in scheme) {
       if (scheme[i].eventName == "NewContributionProposal") {
@@ -409,6 +407,15 @@ async function scanForProposals() {
         filter,
         JSON.parse(scheme[i].abi)
       );
+
+      updateScheme(
+        { id: scheme[i].address },
+        {
+          lastBlockScanned: latestBlock,
+        }
+      );
+
+
       console.log(
         `Found ${proposals.events.length} new proposals on Scheme ${scheme[i].name}`
       );
@@ -429,10 +436,6 @@ async function scanForProposals() {
           console.log(err);
         }
       }
-      updateScheme(
-        { id: scheme[i].address },
-        { lastBlockScanned: latestBlock }
-      );
     }
   } catch (err) {
     sendNotification(
@@ -524,7 +527,7 @@ async function securityAudit() {
 
 //scanForSchemes();
 //securityAudit();
-scanForProposals();
+//scanForProposals();
 
 setInterval(scanForSchemes, process.env.SCAN_SCHEMES_INTERVAL);
 setInterval(scanForProposals, process.env.SCAN_PROPOSALS_INTERVAL);
