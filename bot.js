@@ -25,6 +25,7 @@ const {
   updateScheme,
   upsertScheme,
   upsertProposal,
+  simulateTransaction,
 } = require("./src/utils/utils.js");
 const { sendNotification } = require("./src/notifications.js");
 
@@ -178,6 +179,7 @@ async function getProposalDetails(schemeAddress, proposal) {
       getTokenABI,
       decodedFunction,
       valueEth,
+      tenderlySimulation,
       proposalTitle = "Untitled Proposal";
     const scheme = getSingleScheme({ id: schemeAddress });
     const genesisProtocol = new web3.eth.Contract(
@@ -299,6 +301,11 @@ async function getProposalDetails(schemeAddress, proposal) {
       transactionUrl = `https://etherscan.io/tx/${proposal.transactionHash}`;
     }
     if (proposal.returnValues._callData) {
+      
+       if(state != 'Executed' && state != 'ExpiredInQueue'){
+        tenderlySimulation = await simulateTransaction(scheme.contractToCall ,proposal.returnValues._callData, valueEth)
+       }
+
        decodedResult = await decodeCall(
         JSON.parse(scheme.contractToCallAbi),
         proposal.returnValues._callData
@@ -360,6 +367,7 @@ async function getProposalDetails(schemeAddress, proposal) {
       upvotes,
       downvotes,
       state,
+      tenderlySimulation,
       transactionDetails: proposal,
     };
     upsertProposal(
@@ -526,7 +534,7 @@ async function securityAudit() {
 }
 
 //scanForSchemes();
-//securityAudit();
+securityAudit();
 //scanForProposals();
 
 setInterval(scanForSchemes, process.env.SCAN_SCHEMES_INTERVAL);

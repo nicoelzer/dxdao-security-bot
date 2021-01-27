@@ -66,6 +66,9 @@ async function sendNotification(data, template) {
         messageContent += `*Function Call to be executed:*\n${data.proposal.decodedCallData}\n\n`;
         messageContent += `Raw Calldata: ${data.proposal.callData}\n\n`;
       }
+      if(data.proposal.tenderlySimulation){
+        messageContent += `\n\n*Simulation:* ${data.proposal.tenderlySimulation}\n\n`;
+      }
       messageContent += `*Transaction:* ${data.proposal.transactionUrl}\n`;
       messageContent += `*Raw Transaction Log*: https://gateway.pinata.cloud/ipfs/${data.logHash}\n`;
 
@@ -95,6 +98,9 @@ async function sendNotification(data, template) {
           messageContent += ` – Proposal will pass ✅`;
         } else {
           messageContent += ` – Proposal will fail ❌`;
+        }
+        if(proposal.tenderlySimulation){
+          messageContent += `\n\n*Simulation:* ${proposal.tenderlySimulation}\n`;
         }
         messageContent += `\n${proposal.proposalLink}\n`;
         messageContent += `Status: ${proposal.state}\n\n`;
