@@ -97,31 +97,30 @@ function decodeCall(abi, method) {
   return decodedData;
 }
 
-async function simulateTransaction(contractToCall, callData, value){
-
+async function simulateTransaction(contractToCall, callData, value) {
   var httpheaders = {
-    'Accept': 'application/json',
-    'X-Access-Key': process.env.TENDERLY_ACCESS_KEY
-  }
+    Accept: "application/json",
+    "X-Access-Key": process.env.TENDERLY_ACCESS_KEY,
+  };
 
   var payload = {
-    "network_id": "1",
-    "from": process.env.AVATAR_ADDRESS,
-    "to": contractToCall,
-    "input": callData,
-    "gas": 10000000,
-    "value": value,
-    "save": true,
-    "save_if_fails": true
-  }
+    network_id: "1",
+    from: process.env.AVATAR_ADDRESS,
+    to: contractToCall,
+    input: callData,
+    gas: 10000000,
+    value: value,
+    save: true,
+    save_if_fails: true,
+  };
 
-  const {body} = await got.post(`${process.env.TENDERLY_BASE_API}/simulate`, {
+  const { body } = await got.post(`${process.env.TENDERLY_BASE_API}/simulate`, {
     headers: httpheaders,
     json: true,
-    body: payload
+    body: payload,
   });
-  
-  return `${process.env.TENDERLY_BASE_DASHBOARD}/simulator/${body.simulation.id}`
+
+  return `${process.env.TENDERLY_BASE_DASHBOARD}/simulator/${body.simulation.id}`;
 }
 
 function schemeExists(filter) {

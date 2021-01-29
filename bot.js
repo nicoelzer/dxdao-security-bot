@@ -96,6 +96,8 @@ async function getSchemeDetails(schemeAddress) {
   let eventName;
   if (schemeAbi.includes("NewContributionProposal")) {
     eventName = "NewContributionProposal";
+  } else if (schemeAbi.includes("NewMultiCallProposal")) {
+    eventName = "NewMultiCallProposal";
   } else if (schemeAbi.includes("NewSchemeProposal")) {
     eventName = "NewSchemeProposal";
   } else {
@@ -120,7 +122,10 @@ async function getSchemeDetails(schemeAddress) {
         contractToCallAbi: contractToCallAbi,
       }
     );
-  } else if (schemeAbi.includes("_contractToCall")) {
+  } else if (
+    schemeAbi.includes("_contractToCall") &&
+    !schemeAbi.includes("NewMultiCallProposal")
+  ) {
     const scheme = new web3.eth.Contract(JSON.parse(schemeAbi), schemeAddress);
     const contractToCallAddress = await scheme.methods.contractToCall().call();
     const getContractToCallAbi = await got(
@@ -180,6 +185,11 @@ async function getProposalDetails(schemeAddress, proposal) {
       decodedFunction,
       valueEth,
       tenderlySimulation,
+      multicallContractsToCall = [],
+      multicallCallDatas = [],
+      multicallValues = [],
+      multicallSimulations = [],
+      multicallDecoded = [],
       proposalTitle = "Untitled Proposal";
     const scheme = getSingleScheme({ id: schemeAddress });
     const genesisProtocol = new web3.eth.Contract(
@@ -191,8 +201,65 @@ async function getProposalDetails(schemeAddress, proposal) {
       contracts.DxReputation.address
     );
 
-    if (scheme.abi.includes('"name":"votingMachine"')) {
-      const votingMachine = new web3.eth.Contract(
+    let votingMachine;
+
+    if (scheme.address == "0xef9dC3c39CA40A2a3000ACc5ca0467CE1C250808") {
+      // MultiCall proposals
+      valueEth = 0;
+      votingMachine = new web3.eth.Contract(
+        JSON.parse(scheme.votingMachineAbi),
+        scheme.votingMachineAddress
+      );
+      const proposalDetails = await votingMachine.methods
+        .proposals(proposal.returnValues._proposalId)
+        .call();
+      upstakes = await genesisProtocol.methods
+        .voteStake(proposal.returnValues._proposalId, 1)
+        .call();
+      downstakes = await genesisProtocol.methods
+        .voteStake(proposal.returnValues._proposalId, 2)
+        .call();
+      upvotes = await genesisProtocol.methods
+        .voteStatus(proposal.returnValues._proposalId, 1)
+        .call();
+      downvotes = await genesisProtocol.methods
+        .voteStatus(proposal.returnValues._proposalId, 2)
+        .call();
+      totalRepSupply = await DxReputation.methods.totalSupply().call();
+      proposalId = proposal.returnValues._proposalId;
+      state = ProposalState[proposalDetails.state];
+      winningVote = proposalDetails.winningVote;
+      valueExternalToken = 0;
+      valueRep = 0;
+      transactionUrl = `https://etherscan.io/tx/${proposal.transactionHash}`;
+      callData = proposal.returnValues._callsData;
+    } else if (scheme.address == "0x199719EE4d5DCF174B80b80afa1FE4a8e5b0E3A0") {
+      const proposalDetails = await genesisProtocol.methods
+        .proposals(proposal.returnValues._proposalId)
+        .call();
+      upstakes = await genesisProtocol.methods
+        .voteStake(proposal.returnValues._proposalId, 1)
+        .call();
+      downstakes = await genesisProtocol.methods
+        .voteStake(proposal.returnValues._proposalId, 2)
+        .call();
+      upvotes = await genesisProtocol.methods
+        .voteStatus(proposal.returnValues._proposalId, 1)
+        .call();
+      downvotes = await genesisProtocol.methods
+        .voteStatus(proposal.returnValues._proposalId, 2)
+        .call();
+      totalRepSupply = await DxReputation.methods.totalSupply().call();
+      proposalId = proposal.returnValues._proposalId;
+      state = ProposalState[proposalDetails.state];
+      winningVote = proposalDetails.winningVote;
+      valueEth = proposal.returnValues._value;
+      valueExternalToken = 0;
+      valueRep = 0;
+      transactionUrl = `https://etherscan.io/tx/${proposal.transactionHash}`;
+      callData = proposal.returnValues._callData;
+    } else if (scheme.abi.includes('"name":"votingMachine"')) {
+      votingMachine = new web3.eth.Contract(
         JSON.parse(scheme.votingMachineAbi),
         scheme.votingMachineAddress
       );
@@ -301,12 +368,15 @@ async function getProposalDetails(schemeAddress, proposal) {
       transactionUrl = `https://etherscan.io/tx/${proposal.transactionHash}`;
     }
     if (proposal.returnValues._callData) {
-      
-       if(state != 'Executed' && state != 'ExpiredInQueue'){
-        tenderlySimulation = await simulateTransaction(scheme.contractToCall ,proposal.returnValues._callData, valueEth)
-       }
+      if (state != "Executed" && state != "ExpiredInQueue") {
+        tenderlySimulation = await simulateTransaction(
+          scheme.contractToCall,
+          proposal.returnValues._callData,
+          valueEth
+        );
+      }
 
-       decodedResult = await decodeCall(
+      decodedResult = await decodeCall(
         JSON.parse(scheme.contractToCallAbi),
         proposal.returnValues._callData
       );
@@ -316,6 +386,48 @@ async function getProposalDetails(schemeAddress, proposal) {
           decodedFunction += `${param.value},`;
         });
         decodedFunction += ")";
+      }
+    }
+
+    if (proposal.returnValues._callsData) {
+      // MultiCall Proposal
+
+      for (i = 0; i < proposal.returnValues._contractsToCall.length; i++) {
+        multicallContractsToCall.push(
+          proposal.returnValues._contractsToCall[i]
+        );
+        multicallCallDatas.push(proposal.returnValues._callsData[i]);
+        multicallValues.push(proposal.returnValues._values[i]);
+        valueEth = valueEth + proposal.returnValues._values[i];
+
+        if (state != "Executed" && state != "ExpiredInQueue") {
+          tenderlySimulation = await simulateTransaction(
+            proposal.returnValues._contractsToCall[i],
+            proposal.returnValues._callsData[i],
+            proposal.returnValues._values[i]
+          );
+        }
+
+        const getAbi = await got(
+          `${etherscanBaseUrl}?module=contract&action=getabi&address=${proposal.returnValues._contractsToCall[i]}&apikey=${process.env.ETHERSCAN_APIKEY}`,
+          { responseType: "json" }
+        );
+        const contractAbi = JSON.parse(getAbi.body).result;
+
+        decodedResult = await decodeCall(
+          JSON.parse(contractAbi),
+          proposal.returnValues._callsData[i]
+        );
+        if (decodedResult) {
+          decodedFunction = `${decodedResult.name}(`;
+          decodedResult.params.forEach((param) => {
+            decodedFunction += `${param.value},`;
+          });
+          decodedFunction += ")";
+        }
+
+        multicallSimulations.push(tenderlySimulation);
+        multicallDecoded.push(decodedFunction);
       }
     }
 
@@ -367,6 +479,11 @@ async function getProposalDetails(schemeAddress, proposal) {
       upvotes,
       downvotes,
       state,
+      multicallContractsToCall,
+      multicallCallDatas,
+      multicallValues,
+      multicallSimulations,
+      multicallDecoded,
       tenderlySimulation,
       transactionDetails: proposal,
     };
@@ -422,7 +539,6 @@ async function scanForProposals() {
           lastBlockScanned: latestBlock,
         }
       );
-
 
       console.log(
         `Found ${proposals.events.length} new proposals on Scheme ${scheme[i].name}`

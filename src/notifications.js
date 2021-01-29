@@ -30,27 +30,7 @@ async function sendNotification(data, template) {
           web3.utils.fromWei(totalRepSupply, "ether")) *
         100
       ).toFixed(2)} %)  \n\n`;
-      if (data.proposal.valueEth > 0 || data.proposal.valueExternalToken > 0) {
-        messageContent += `*Value & Token Transfers:*\n`;
-        if (data.proposal.valueEth > 0) {
-          messageContent += `${web3.utils.fromWei(
-            data.proposal.valueEth.toString(),
-            "ether"
-          )} ETH ➡️ ${data.proposal.beneficiary}\n`;
-        }
-        if (data.proposal.valueExternalToken > 0) {
-          let valToken = data.proposal.valueExternalToken;
-          messageContent += `${(
-            valToken /
-            10 ** data.proposal.externalTokenDecimals
-          ).toFixed()} ${data.proposal.externalTokenSymbol} ➡️  ${
-            data.proposal.beneficiary
-          }\nTokenAddress: ${data.proposal.externalTokenAddress}\n `;
-        }
-        messageContent += `\n`;
-      } else {
-        messageContent += `*Value & Token Transfers:*\nNo transfers\n\n`;
-      }
+
       if (data.proposal.valueRep > 0) {
         messageContent += `*Reputation:*\n${Math.round(
           web3.utils.fromWei(data.proposal.valueRep.toString(), "ether")
@@ -62,15 +42,69 @@ async function sendNotification(data, template) {
       } else {
         messageContent += `*Reputation:*\nNo REP distributions\n\n`;
       }
-      if (data.proposal.decodedCallData) {
-        messageContent += `*Function Call to be executed:*\n${data.proposal.decodedCallData}\n\n`;
-        messageContent += `Raw Calldata: ${data.proposal.callData}\n\n`;
+
+      if (data.proposal.schemeName == "MultiCall") {
+        // MultiCall Proposals
+
+        for (i = 0; i < data.proposal.multicallContractsToCall.length; i++) {
+          messageContent += `* –––––––––––––– CALL ${[i + 1]} OF ${
+            data.proposal.multicallContractsToCall.length
+          }: ––––––––––––––  *\n`;
+
+          if (data.proposal.multicallValues[i] > 0) {
+            messageContent += `\t*Value & Token Transfers:*\n`;
+            messageContent += `\t${web3.utils.fromWei(
+              data.proposal.multicallValues[i].toString(),
+              "ether"
+            )} ETH ➡️ ${data.proposal.multicallContractsToCall[i]}\n`;
+          } else {
+            messageContent += `\t*Value & Token Transfers:*\n\tNo transfers\n`;
+          }
+          messageContent += `\n\t*Function Call to be executed:*\n\t${data.proposal.multicallDecoded[i]}\n`;
+          messageContent += `\n\t*Target Contract:* https://etherscan.io/address/${data.proposal.multicallContractsToCall[i]}\n`;
+          messageContent += `\n\t*Raw Calldata:* \n\t${data.proposal.multicallCallDatas[i]}\n`;
+          messageContent += `\n\t*Simulation:* ${data.proposal.multicallSimulations[i]}\n\n`;
+        }
+
+        messageContent += `* –––––––––––––– END CALLS ––––––––––––––  *\n\n`;
+      } else {
+        // Non-MultiCall Proposals
+        if (
+          data.proposal.valueEth > 0 ||
+          data.proposal.valueExternalToken > 0
+        ) {
+          messageContent += `*Value & Token Transfers:*\n`;
+          if (data.proposal.valueEth > 0) {
+            messageContent += `${web3.utils.fromWei(
+              data.proposal.valueEth.toString(),
+              "ether"
+            )} ETH ➡️ ${data.proposal.beneficiary}\n`;
+          }
+          if (data.proposal.valueExternalToken > 0) {
+            let valToken = data.proposal.valueExternalToken;
+            messageContent += `${(
+              valToken /
+              10 ** data.proposal.externalTokenDecimals
+            ).toFixed()} ${data.proposal.externalTokenSymbol} ➡️  ${
+              data.proposal.beneficiary
+            }\nTokenAddress: ${data.proposal.externalTokenAddress}\n `;
+          }
+          messageContent += `\n`;
+        } else {
+          messageContent += `*Value & Token Transfers:*\nNo transfers\n`;
+        }
+
+        if (data.proposal.decodedCallData) {
+          messageContent += `*Function Call to be executed:*\n${data.proposal.decodedCallData}\n\n`;
+          messageContent += `Raw Calldata: ${data.proposal.callData}\n\n`;
+        }
+        if (data.proposal.tenderlySimulation) {
+          messageContent += `\n\n*Simulation:* ${data.proposal.tenderlySimulation}\n\n`;
+        }
       }
-      if(data.proposal.tenderlySimulation){
-        messageContent += `\n\n*Simulation:* ${data.proposal.tenderlySimulation}\n\n`;
-      }
+
       messageContent += `*Transaction:* ${data.proposal.transactionUrl}\n`;
-      messageContent += `*Raw Transaction Log*: https://gateway.pinata.cloud/ipfs/${data.logHash}\n`;
+      messageContent += `*Raw Transaction Log*: https://gateway.pinata.cloud/ipfs/${data.logHash}\n\n`;
 
       if (process.env.MODE == 1) {
         sendKeybaseMessage("dx_dao", "Security", messageContent);
@@ -99,9 +133,36 @@ async function sendNotification(data, template) {
         } else {
           messageContent += ` – Proposal will fail ❌`;
         }
-        if(proposal.tenderlySimulation){
+        if (proposal.tenderlySimulation) {
           messageContent += `\n\n*Simulation:* ${proposal.tenderlySimulation}\n`;
         }
+
+        if (proposal.schemeName == "MultiCall") {
+          // MultiCall Proposals
+
+          for (i = 0; i < proposal.multicallContractsToCall.length; i++) {
+            messageContent += `* –––––––––––––– CALL ${[i + 1]} OF ${
+              proposal.multicallContractsToCall.length
+            }: ––––––––––––––  *\n`;
+
+            if (proposal.multicallValues[i] > 0) {
+              messageContent += `\t*Value & Token Transfers:*\n`;
+              messageContent += `\t${web3.utils.fromWei(
+                proposal.multicallValues[i].toString(),
+                "ether"
+              )} ETH ➡️ ${proposal.multicallContractsToCall[i]}\n`;
+            } else {
+              messageContent += `\t*Value & Token Transfers:*\n\tNo transfers\n`;
+            }
+            messageContent += `\n\t*Function Call to be executed:*\n\t${proposal.multicallDecoded[i]}\n`;
+            messageContent += `\n\t*Target Contract:* https://etherscan.io/address/${proposal.multicallContractsToCall[i]}\n`;
+            messageContent += `\n\t*Raw Calldata:* \n\t${proposal.multicallCallDatas[i]}\n`;
+            messageContent += `\n\t*Simulation:* ${proposal.multicallSimulations[i]}\n\n`;
+          }
+
+          messageContent += `* –––––––––––––– END CALLS ––––––––––––––  *\n\n`;
+        }
+
         messageContent += `\n${proposal.proposalLink}\n`;
         messageContent += `Status: ${proposal.state}\n\n`;
       });
