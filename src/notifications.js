@@ -1,13 +1,18 @@
 require("dotenv").config();
 const Bot = require("keybase-bot");
 var dateFormat = require("dateformat");
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const Web3 = require("web3");
 const web3 = new Web3(
   new Web3.providers.HttpProvider(
     `https://mainnet.infura.io/v3/${process.env.INFURAKEY}`
   )
 );
+const { getSingleScheme } = require("./utils/utils.js");
+
+const { createGithubIssue } = require("./github.js");
 var messageContent;
+var completeMessage;
 
 async function sendNotification(data, template) {
   switch (template) {
@@ -107,7 +112,12 @@ async function sendNotification(data, template) {
       messageContent += `*Raw Transaction Log*: https://gateway.pinata.cloud/ipfs/${data.logHash}\n\n`;
 
       if (process.env.MODE == 1) {
-        sendKeybaseMessage("dx_dao", "Security", messageContent);
+        //sendKeybaseMessage("dx_dao", "Security", messageContent);
+        createGithubIssue(
+          data.proposal.proposalTitle,
+          messageContent,
+          data.proposal.schemeName
+        );
       } else {
         console.log(messageContent);
       }
@@ -119,9 +129,16 @@ async function sendNotification(data, template) {
         new Date(),
         "dd/mm/yy"
       )}*\n\n`;
+      let schemeDetail;
       messageContent += `*Monitoring ${data.scheme.length} Schemes on DXdao:*\n`;
       data.scheme.forEach((element) => {
-        messageContent += "• " + element.name + "\n";
+        schemeDetail = getSingleScheme({ id: element.address });
+        messageContent +=
+          "• " +
+          element.name +
+          " (" +
+          schemeDetail.openProposals +
+          " proposals)\n";
       });
 
       messageContent += `\n\n*All open proposals:*\n\n`;
@@ -165,15 +182,30 @@ async function sendNotification(data, template) {
 
         messageContent += `\n${proposal.proposalLink}\n`;
         messageContent += `Status: ${proposal.state}\n\n`;
+
+        // prevention for messages that are getting too long. Multiple messages will be sent.
+        if (messageContent.length > 5000) {
+          completeMessage += messageContent;
+          sendKeybaseMessage("dx_dao", "Security", messageContent);
+          messageContent = "";
+        }
       });
 
       messageContent += `\n\nScheme Raw Log: https://gateway.pinata.cloud/ipfs/${data.schemeLog}\n`;
       messageContent += `Proposals Raw Log: https://gateway.pinata.cloud/ipfs/${data.proposalLog}`;
+      completeMessage += messageContent;
 
       if (process.env.MODE == 1) {
+        await sleep(9000);
         sendKeybaseMessage("dx_dao", "Security", messageContent);
+        /*
+        createGithubIssue(`Manual Security Check ${dateFormat(
+          new Date(),
+          "dd/mm/yy"
+        )}`, "");
+        */
       } else {
-        console.log(messageContent);
+        console.log(completeMessage);
       }
 
       break;

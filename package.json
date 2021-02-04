@@ -20,12 +20,11 @@
   "dependencies": {
     "@pinata/sdk": "^1.1.11",
     "abi-decoder": "^2.3.0",
+    "axios": "^0.21.1",
     "dateformat": "^3.0.3",
     "dotenv": "^8.2.0",
     "express": "^4.17.1",
     "lowdb": "^1.0.0",
-    "request": "^2.88.2",
-    "request-promise": "^4.2.5",
     "web3": "^1.2.11"
   },
   "devDependencies": {

@@ -28,6 +28,7 @@ const {
   simulateTransaction,
 } = require("./src/utils/utils.js");
 const { sendNotification } = require("./src/notifications.js");
+const { createGithubIssue } = require("./src/github.js");
 
 const ProposalState = {
   0: "None",
@@ -584,6 +585,15 @@ async function securityAudit() {
     });
     let filter = {};
     for (var i in scheme) {
+      let openProposals = 0;
+      upsertScheme(
+        { id: scheme[i].address },
+        {
+          id: scheme[i].address,
+          address: scheme[i].address,
+          openProposals: 0,
+        }
+      );
       console.log(
         `Searching for active proposals on scheme ${scheme[i].name} (${scheme[i].address})...`
       );
@@ -611,6 +621,15 @@ async function securityAudit() {
             proposal.state != "ExpiredInQueue" &&
             proposal.state != "Executed"
           ) {
+            let schemeDetail = getSingleScheme({ id: scheme[i].address });
+            upsertScheme(
+              { id: scheme[i].address },
+              {
+                id: scheme[i].address,
+                address: scheme[i].address,
+                openProposals: schemeDetail.openProposals + 1,
+              }
+            );
             activeProposals.push(proposal);
           }
         } catch (err) {
